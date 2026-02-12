@@ -756,7 +756,7 @@ input:checked+.slider {
 .settings-footer {
     padding: 20px;
     display: flex;
-    justify-content: space-between; /* 两端对齐 */
+    justify-content: flex-end; /* 右对齐 */
     align-items: center;
     gap: 10px;
 }

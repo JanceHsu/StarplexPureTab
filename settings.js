@@ -14,6 +14,7 @@ function saveSettings() {
         showSearchHistoryEnabled: showSearchHistoryEnabled,
         engineSwitchEnabled: engineSwitchEnabled,
         bgInfoEnabled: bgInfoEnabled,
+        directJumpEnabled: directJumpEnabled
     };
     localStorage.setItem('searchPageSettings', JSON.stringify(settings));
 }
@@ -142,6 +143,12 @@ function loadSettings() {
             updateBgInfoBtnVisible();
         }
 
+        // 加载直接跳转设置
+        if (settings.directJumpEnabled !== undefined) {
+            directJumpEnabled = settings.directJumpEnabled;
+            directJumpToggle.checked = directJumpEnabled;
+        }
+
         updateTitleDisplay();
         setSearchEngineName();
     } else {
@@ -177,6 +184,14 @@ function loadSettings() {
         showSearchHistoryEnabled = true;
         showSearchHistoryToggle.checked = true;
 
+        engineSwitchEnabled = true;
+        bgInfoEnabled = true;
+        engineSwitchToggle.checked = true;
+        bgInfoToggle.checked = true;
+
+        directJumpEnabled = false;
+        directJumpToggle.checked = false;
+
         updateTitleDisplay();
         setSearchEngineName();
     }
@@ -210,6 +225,9 @@ function resetSettings() {
         bgInfoEnabled = true;
         engineSwitchToggle.checked = true;
         bgInfoToggle.checked = true;
+        
+        directJumpEnabled = false;
+        directJumpToggle.checked = false;
 
         // 重置UI
         setSearchEngine('bing');
@@ -297,6 +315,9 @@ function exportSettings() {
         showTitle: showTitle,
         customTitleText: customTitleText,
         showSearchHistoryEnabled: showSearchHistoryEnabled,
+        engineSwitchEnabled: engineSwitchEnabled,
+        bgInfoEnabled: bgInfoEnabled,
+        directJumpEnabled: directJumpEnabled
     };
 
     // 转换为JSON字符串
@@ -423,6 +444,11 @@ function importSettings(e) {
                 bgInfoEnabled = settings.bgInfoEnabled;
                 bgInfoToggle.checked = bgInfoEnabled;
                 updateBgInfoBtnVisible();
+            }
+
+            if (settings.directJumpEnabled !== undefined) {
+                directJumpEnabled = settings.directJumpEnabled;
+                directJumpToggle.checked = directJumpEnabled;
             }
 
             saveSettings();

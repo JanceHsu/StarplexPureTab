@@ -14,6 +14,7 @@ let isRemovingHistory = false;
 let settingsBackup = null; // 用于重置设置时的备份
 let engineSwitchEnabled = true;
 let bgInfoEnabled = true;
+let directJumpEnabled = false;
 
 // 主题色变量
 const lightBg = '#ffffff';
@@ -42,7 +43,7 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsOverlay = document.getElementById('settings-overlay');
 const closeSettingsBtn = document.getElementById('close-settings');
-const applySettingsBtn = document.getElementById('apply-settings');
+// const applySettingsBtn = document.getElementById('apply-settings'); // Removed
 const bgTypeRadios = document.querySelectorAll('input[name="bg-type"]');
 const bgColorPicker = document.getElementById('bg-color-picker');
 const bgColorSetting = document.querySelector('.bg-color-setting');
@@ -79,6 +80,7 @@ const engineSwitcherDropdown = document.getElementById('engine-switcher-dropdown
 const bgInfoBtn = document.getElementById('bg-info-btn');
 const engineSwitchToggle = document.getElementById('engine-switch-toggle');
 const bgInfoToggle = document.getElementById('bg-info-toggle');
+const directJumpToggle = document.getElementById('direct-jump-toggle');
 const engineSwitcherCaret = document.getElementById('engine-switcher-caret');
 
 // 初始化函数
@@ -88,6 +90,10 @@ function init() {
 
     // 加载设置
     loadSettings();
+
+    // 初始化标题显示
+    customTitleInput.value = customTitleText;
+    updateTitleDisplay();
 
     // 获取必应图片
     if (currentBgType === 'bing') {
@@ -117,32 +123,13 @@ function setupEventListeners() {
     closeSettingsBtn.addEventListener('click', closeSettings);
     settingsOverlay.addEventListener('click', closeSettings);
 
-    // 应用设置
-    applySettingsBtn.addEventListener('click', () => {
-        // 检查快速链接是否有未填写网址
-        const hasEmptyUrl = quickLinks.some(link => !link.url.trim());
-        if (hasEmptyUrl) {
-            showToast('请填写所有快速链接的网址');
-            return; // 不保存、不收起设置面板
-        }
-        saveSettings();
-        settingsBackup = null; // 清空缓存，表示已保存
-
-        closeSettings();
-
-        updateQuickLinksDisplay(); // 应用设置后立即更新快速链接显示
-        setSearchEngineName();
-        updateEngineSwitcherUI();
-        updateTitleDisplay();
-        showToast('设置已保存');
-    });
-
     // 背景类型切换
     bgTypeRadios.forEach(radio => {
         radio.addEventListener('change', function () {
             if (this.checked) {
                 currentBgType = this.value;
                 switchBgType(currentBgType);
+                saveSettings(); // Save immediately
             }
         });
     });
@@ -151,22 +138,38 @@ function setupEventListeners() {
     engineSwitchToggle.addEventListener('change', function () {
         engineSwitchEnabled = this.checked;
         updateEngineSwitcherVisible();
+        saveSettings(); // Save immediately
     });
 
     // 背景信息功能开关
     bgInfoToggle.addEventListener('change', function () {
         bgInfoEnabled = this.checked;
         updateBgInfoBtnVisible();
+        saveSettings(); // Save immediately
+    });
+
+    // 直接跳转功能开关
+    directJumpToggle.addEventListener('change', function () {
+        directJumpEnabled = this.checked;
+        saveSettings(); // Save immediately
     });
 
     // 背景颜色变化
-    bgColorPicker.addEventListener('input', handleColorChange);
+    bgColorPicker.addEventListener('input', function(e) {
+        handleColorChange(e);
+        saveSettings(); // Save immediately
+    });
 
-    // 背景图片上传
+    // 背景图片上传 - handleImageUpload already sets the image, but we need to ensure it saves if handleImageUpload succeeds. 
+    // handleImageUpload is async via FileReader and calls setBingBg (actually sets background style directly).
+    // Let's modify handleImageUpload function itself instead of listener for better control.
     bgImageUpload.addEventListener('change', handleImageUpload);
 
     // 主题颜色变化
-    themeColorPicker.addEventListener('input', handleThemeColorChange);
+    themeColorPicker.addEventListener('input', function(e) {
+        handleThemeColorChange(e);
+        saveSettings(); // Save immediately
+    });
 
     // 显示模式切换
     displayModeRadios.forEach(radio => {
@@ -174,6 +177,7 @@ function setupEventListeners() {
             if (this.checked) {
                 currentDisplayMode = this.value;
                 updateDisplayMode();
+                saveSettings(); // Save immediately
             }
         });
     });
@@ -183,6 +187,9 @@ function setupEventListeners() {
         radio.addEventListener('change', function () {
             if (this.checked) {
                 currentEngine = this.value;
+                setSearchEngine(currentEngine); // Ensure UI sync 
+                setSearchEngineName();
+                saveSettings(); // Save immediately
             }
         });
     });
@@ -192,15 +199,17 @@ function setupEventListeners() {
         overlayOpacity = parseInt(this.value);
         overlayOpacityValue.textContent = `${overlayOpacity}%`;
         updateOverlayOpacity();
+        saveSettings(); // Save immediately
     });
 
     // 快速链接开关
     quickLinksToggle.addEventListener('change', function () {
         quickLinksEnabled = this.checked;
         updateQuickLinksToggleUI();
+        saveSettings(); // Save immediately
     });
 
-    // 添加快速链接
+    // 添加快速链接- inside addNewLink
     addLinkBtn.addEventListener('click', addNewLink);
 
     // 重置设置
@@ -223,18 +232,21 @@ function setupEventListeners() {
     showTitleToggle.addEventListener('change', function () {
         showTitle = this.checked;
         updateTitleDisplay();
+        saveSettings(); // Save immediately
     });
 
     // 自定义标题输入
     customTitleInput.addEventListener('input', function () {
         customTitleText = this.value;
         updateTitleDisplay();
+        saveSettings(); // Save immediately
     });
 
     // 历史记录开关
     showSearchHistoryToggle.addEventListener('change', function () {
         showSearchHistoryEnabled = this.checked;
         updateSearchHistoryDisplay();
+        saveSettings(); // Save immediately
     });
 
     // 清除搜索历史
@@ -271,51 +283,91 @@ function setupEventListeners() {
 
 }
 
-// 处理搜索提交
+// 判断给定主机名是否应该优先使用 http（局域网、IP、localhost、无点名、.local 等）
+function needsHttp(host) {
+    if (!host) return false;
+    host = host.toLowerCase().trim();
+    if (host === 'localhost') return true;
+    if (host.endsWith('.local')) return true;
+    // IPv4（允许端口）
+    if (/^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(host)) return true;
+    // 常见私有网段
+    if (/^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
+    // 没有点的短主机名（可能为内网主机名）
+    if (host.indexOf('.') === -1) return true;
+    return false;
+}
+
+// 处理搜索提交（支持直接跳转到网址，并对无协议的地址智能选择 http/https）
 function handleSearch(e) {
     e.preventDefault();
-    const query = searchInput.value.trim();
-    if (query) {
-        let url = '';
-        saveSearchHistory(query); // 保存历史
-        switch (currentEngine) {
-            case 'google':
-                url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-                break;
-            case 'bing':
-                url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-                break;
-            case 'yandex':
-                url = `https://yandex.com/search/?text=${encodeURIComponent(query)}`;
-                break;
-            case 'baidu':
-                url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
-                break;
-            default:
-                url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-        }
-        // 当前标签页跳转
-        window.location.href = url;
+    const raw = (searchInput.value || '').trim();
+    if (!raw) return;
+
+    // 已带协议的直接使用（保持用户输入意图），不受设置限制
+    if (/^https?:\/\//i.test(raw)) {
+        window.location.href = raw;
+        return;
     }
+
+    // 判断是否应该直接跳转
+    let shouldJump = false;
+    
+    // 只有在启用设置时才进行智能识别
+    if (directJumpEnabled) {
+        // 识别 IPv4 地址 (X.X.X.X[:port])
+        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d+)?(\/.*)?$/;
+        
+        // 识别 localhost
+        const localhostRegex = /^localhost(:\d+)?(\/.*)?$/i;
+        
+        // 识别标准域名 (xxx.xx.xx)
+        // 要求至少包含一个点，且顶级域名至少2个字母
+        // 排除纯数字或非标准字符
+        const domainRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}(?::\d+)?(\/.*)?$/;
+
+        if (ipRegex.test(raw) || localhostRegex.test(raw) || domainRegex.test(raw)) {
+            shouldJump = true;
+        }
+    }
+
+    if (shouldJump) {
+        // 取出 hostCandidate（raw 的主机部分）
+        let hostCandidate = raw.split('/')[0];
+        // 如果包含 scheme-like 前缀（极少情况），移除
+        hostCandidate = hostCandidate.replace(/^https?:\/\//i, '');
+        // 选择协议
+        const proto = needsHttp(hostCandidate) ? 'http' : 'https';
+        const url = `${proto}://${raw}`;
+        window.location.href = url;
+        return;
+    }
+
+    // 不是网址，按搜索引擎搜索
+    saveSearchHistory(raw); // 保存历史
+    let url = '';
+    switch (currentEngine) {
+        case 'google':
+            url = `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
+            break;
+        case 'bing':
+            url = `https://www.bing.com/search?q=${encodeURIComponent(raw)}`;
+            break;
+        case 'yandex':
+            url = `https://yandex.com/search/?text=${encodeURIComponent(raw)}`;
+            break;
+        case 'baidu':
+            url = `https://www.baidu.com/s?wd=${encodeURIComponent(raw)}`;
+            break;
+        default:
+            url = `https://www.bing.com/search?q=${encodeURIComponent(raw)}`;
+    }
+    window.location.href = url;
 }
 
 
 // 打开设置面板
 function openSettings() {
-    // 缓存当前设置
-    settingsBackup = {
-        currentEngine,
-        currentBgType,
-        currentThemeColor,
-        currentDisplayMode,
-        overlayOpacity,
-        quickLinksEnabled,
-        quickLinks: JSON.parse(JSON.stringify(quickLinks)), // 深拷贝
-        showTitle,
-        customTitleText,
-        showSearchHistoryEnabled
-    };
-
     settingsOverlay.classList.remove('hidden');
     settingsPanel.classList.remove('hidden');
     // 添加动画效果
@@ -329,51 +381,6 @@ function openSettings() {
 function closeSettings() {
     settingsOverlay.style.opacity = '0';
     settingsPanel.style.transform = 'translateX(100%)';
-
-    // 恢复未保存的设置
-    if (settingsBackup) {
-        // 恢复变量
-        currentEngine = settingsBackup.currentEngine;
-        currentBgType = settingsBackup.currentBgType;
-        currentThemeColor = settingsBackup.currentThemeColor;
-        currentDisplayMode = settingsBackup.currentDisplayMode;
-        overlayOpacity = settingsBackup.overlayOpacity;
-        quickLinksEnabled = settingsBackup.quickLinksEnabled;
-        quickLinks = JSON.parse(JSON.stringify(settingsBackup.quickLinks));
-        showTitle = settingsBackup.showTitle;
-        customTitleText = settingsBackup.customTitleText;
-        showSearchHistoryEnabled = settingsBackup.showSearchHistoryEnabled;
-
-        // 恢复UI
-        setSearchEngine(currentEngine);
-        setSearchEngineName();
-        themeColorPicker.value = currentThemeColor;
-        document.documentElement.style.setProperty('--theme-color', currentThemeColor);
-        displayModeRadios.forEach(radio => {
-            radio.checked = radio.value === currentDisplayMode;
-        });
-        updateDisplayMode();
-        overlayOpacitySlider.value = overlayOpacity;
-        overlayOpacityValue.textContent = `${overlayOpacity}%`;
-        updateOverlayOpacity();
-        quickLinksToggle.checked = quickLinksEnabled;
-        updateQuickLinksToggleUI();
-        updateQuickLinksEditor();
-        showTitleToggle.checked = showTitle;
-        customTitleInput.value = customTitleText;
-        updateTitleDisplay();
-        showSearchHistoryToggle.checked = showSearchHistoryEnabled;
-        updateSearchHistoryDisplay();
-        switchBgType(currentBgType);
-
-        // 其它UI恢复
-        bgTypeRadios.forEach(radio => {
-            radio.checked = radio.value === currentBgType;
-        });
-        bgColorPicker.value = (currentBgType === 'color') ? backgroundLayer.style.background : bgColorPicker.value;
-
-        showToast('设置未保存');
-    }
 
     // 动画结束后隐藏元素
     setTimeout(() => {
@@ -521,7 +528,7 @@ function setupEngineSwitcherEvents() {
 
 // 设置搜索引擎提示
 function setSearchEngineName() {
-    searchInput.placeholder = '在' + currentEngine.charAt(0).toUpperCase() + currentEngine.slice(1) + '中搜索……';
+    searchInput.placeholder = '在 ' + currentEngine.charAt(0).toUpperCase() + currentEngine.slice(1) + ' 中搜索……';
 }
 
 // 更新显示模式
@@ -576,6 +583,8 @@ function addNewLink() {
 
     quickLinks.push(newLink);
     updateQuickLinksEditor();
+    updateQuickLinksDisplay(); // Update display
+    saveSettings(); // Save immediately
 }
 
 // 更新快速链接编辑器
@@ -612,22 +621,31 @@ function updateQuickLinksEditor() {
         // 实时更新名称数据
         nameInput.addEventListener('input', function () {
             quickLinks[index].name = this.value;
+            saveSettings(); // Save immediately
+            updateQuickLinksDisplay(); // Live update main view
         });
 
         // 实时更新网址数据
         urlInput.addEventListener('input', function () {
             quickLinks[index].url = this.value;
+            saveSettings(); // Save immediately
+            updateQuickLinksDisplay(); // Live update main view
         });
 
         // 失焦时自动补全HTTPS协议
         urlInput.addEventListener('blur', function () {
             let val = this.value.trim();
+            if (!val) return;
             // 如果已经有 http:// 或 https://，不处理
             if (/^https?:\/\//i.test(val)) return;
-            // 简单判断是否为网址格式（有点号且无空格）
-            if (/^[^\s]+\.[^\s]+$/.test(val)) {
-                this.value = 'https://' + val;
+            // 简单判断是否为网址格式（有点号且无空格）或 ip/localhost
+            if (/^[^\s]+\.[^\s]+$/.test(val) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(val) || /^localhost(:\d+)?$/i.test(val)) {
+                const hostCandidate = val.split('/')[0];
+                const proto = needsHttp(hostCandidate) ? 'http' : 'https';
+                this.value = `${proto}://${val}`;
                 quickLinks[index].url = this.value;
+                saveSettings(); // Save updated URL
+                updateQuickLinksDisplay();
             }
         });
 
@@ -637,6 +655,8 @@ function updateQuickLinksEditor() {
             const idx = parseInt(this.getAttribute('data-index'));
             quickLinks.splice(idx, 1);
             updateQuickLinksEditor();
+            updateQuickLinksDisplay();
+            saveSettings(); // Save immediately
         });
 
         // 添加上移事件监听器
@@ -648,6 +668,8 @@ function updateQuickLinksEditor() {
                 quickLinks[idx - 1] = quickLinks[idx];
                 quickLinks[idx] = temp;
                 updateQuickLinksEditor();
+                updateQuickLinksDisplay();
+                saveSettings(); // Save immediately
             } else showToast('已经是第一个快速链接了');
         });
 
@@ -660,6 +682,8 @@ function updateQuickLinksEditor() {
                 quickLinks[idx + 1] = quickLinks[idx];
                 quickLinks[idx] = temp;
                 updateQuickLinksEditor();
+                updateQuickLinksDisplay();
+                saveSettings(); // Save immediately
             } else showToast('已经是最后一个快速链接了');
         });
 
@@ -742,7 +766,8 @@ function fetchBingImage() {
     const cache = JSON.parse(localStorage.getItem('bingBgCache') || '{}');
     const today = new Date().toISOString().slice(0, 10);
 
-    if (cache.date === today && cache.url) {
+    // 优先显示最近一次缓存的图片（不管日期）
+    if (cache.url) {
         setBingBg(cache.url);
         if (cache.desc) {
             bingImageInfo = {
@@ -750,29 +775,37 @@ function fetchBingImage() {
                 url: cache.url
             };
         }
-        return;
     }
 
+    // 异步请求最新图片
     fetch('https://bing.biturl.top/')
         .then(response => response.json())
         .then(data => {
             if (data && data.url) {
-                setBingBg(data.url);
-                bingImageInfo = {
-                    desc: data.copyright || '',
-                    url: data.url
-                };
-                // 缓存到本地
-                localStorage.setItem('bingBgCache', JSON.stringify({
-                    date: today,
-                    url: data.url,
-                    desc: data.copyright || ''
-                }));
+                // 如果是新的一天，或者图片发生变化，才更新缓存和页面
+                if (cache.date !== today || cache.url !== data.url) {
+                    // 预加载图片，加载完成后再切换背景
+                    const img = new Image();
+                    img.onload = function () {
+                        setBingBg(data.url);
+                    };
+                    img.src = data.url;
+
+                    bingImageInfo = {
+                        desc: data.copyright || '',
+                        url: data.url
+                    };
+                    // 缓存到本地
+                    localStorage.setItem('bingBgCache', JSON.stringify({
+                        date: today,
+                        url: data.url,
+                        desc: data.copyright || ''
+                    }));
+                }
             }
         })
         .catch(error => {
             console.error('获取必应图片失败:', error);
-            if (cache.url) setBingBg(cache.url);
         });
 }
 
@@ -864,18 +897,20 @@ function saveSearchHistory(keyword) {
 
 // 隐藏搜索历史
 function hideSearchHistory() {
+    // 延迟隐藏，以便点击历史记录项的事件能被触发
+    setTimeout(() => {
+        // 清除单条历史记录时不隐藏
+        if (isRemovingHistory) {
+            searchInput.focus();
+            return;
+        }
 
-    // 清除单条历史记录时不隐藏
-    if (isRemovingHistory) {
-        searchInput.focus();
-        return;
-    }
-
-    const list = document.getElementById('search-history-list');
-    if (list) {
-        list.classList.remove('active');
-    }
-    updateSearchInputContainerBackground('blur');
+        const list = document.getElementById('search-history-list');
+        if (list) {
+            list.classList.remove('active');
+        }
+        updateSearchInputContainerBackground('blur');
+    }, 200);
 }
 
 // 清除搜索历史
@@ -915,6 +950,9 @@ function showSearchHistory() {
 
         // 点击历史文本进行搜索
         textSpan.onmousedown = () => {
+            // 先把该项保存到历史顶部，确保顺序更新
+            saveSearchHistory(item);
+
             searchInput.value = item;
             const list = document.getElementById('search-history-list');
             if (list) list.classList.remove('active');
@@ -939,9 +977,8 @@ function showSearchHistory() {
                         url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
                 }
                 window.location.href = url;
-
             }
-            searchInput.blur();
+            // 不再调用 searchInput.blur()，避免触发额外隐藏逻辑导致问题
         };
 
         // 删除按钮

@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新标签页</title>
-    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <title>星函标签页</title>
+    <link rel="icon" href="assets/logo_clear.png" type="image/png">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -122,6 +122,14 @@
                         <span class="slider round"></span>
                     </label>
                 </div>
+
+                <div class="setting-item" style="margin-top: 5px;">
+                    <label class="setting-label">启用输入网址后直接跳转</label>
+                    <label class="switch">
+                        <input type="checkbox" id="direct-jump-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
             </div>
 
             <hr class="section-divider">
@@ -137,7 +145,7 @@
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label class="setting-label">最多可以保存10条历史记录</label>
+                    <label class="setting-label">最多可以保存 10 条历史记录</label>
                     <label id="clear-history-btn" class="clear-history-btn">
                         <i class="fas fa-trash"></i> 清除全部历史记录
                     </label>
@@ -159,7 +167,7 @@
 
                 <div id="quick-links-editor" class="quick-links-editor">
                     <h3>管理快速链接</h3>
-                    <label class="setting-label">最多可以添加10个快速链接</label>
+                    <label class="setting-label">最多可以添加 10 个快速链接</label>
                     <div id="links-list" class="links-list">
                         <!-- 快速链接将在这里动态生成 -->
                     </div>
@@ -316,13 +324,13 @@
             <div class="settings-section">
                 <h3>关于</h3>
                 <div class="setting-item">
-                    <img src="./assets/logo_blue_long.png" alt="星函标签页"
-                        style="display:block;max-width:220px;margin:0 auto 18px auto;">
-                    <label class="setting-label" style="font-weight: 700;">星函标签页<br>STARPLEX TAB</label>
-                    <label class="setting-label">一个简洁而实用的新标签页扩展插件</label>
+                    <img src="./assets/logo_clear.png" alt="星函标签页"
+                        style="display:block;width:100px;margin:0 auto 18px auto;border-radius:25%;">
+                    <label class="setting-label" style="font-weight: 700;">星函标签页<br>STARPLEX PURETAB</label>
+                    <label class="setting-label">让每一次上网都赏心悦目</label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">版本</label>
-                        <label style="width: 50%; text-align: right;">1.2.18</label>
+                        <label style="width: 50%; text-align: right;">1.2.4</label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">作者</label>
@@ -331,13 +339,13 @@
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">更新日志</label>
                         <label style="width: 50%; text-align: right;">
-                            <a href="./log.html" class="about-link-btn"><i class="fas fa-book"></i> 点击查看</a>
+                            <a href="https://starplex.top/product-puretab#updatelogs" class="about-link-btn"><i class="fas fa-book"></i> 点击查看</a>
                         </label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">开源项目地址</label>
                         <label style="width: 50%; text-align: right;">
-                            <a href="https://github.com/JanceHsu/StarplexTab" class="about-link-btn" target="_blank">
+                            <a href="https://github.com/JanceHsu/StarplexPureTab" class="about-link-btn" target="_blank">
                                 <i class="fab fa-github"></i> 点击前往
                             </a>
                         </label>
@@ -373,9 +381,6 @@
         <div class="settings-footer">
             <button id="reset-settings" class="reset-btn">
                 <i class="fas fa-redo"></i> 重置设置
-            </button>
-            <button id="apply-settings" class="apply-settings-btn">
-                <i class="fas fa-save"></i> 保存设置
             </button>
         </div>
     </div>

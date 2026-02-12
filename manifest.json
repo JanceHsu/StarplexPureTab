@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "星函标签页",
-  "version": "1.2.12",
-  "description": "一个简洁而实用的新标签页扩展插件",
+  "version": "1.2.4",
+  "description": "简洁实用的新标签页扩展插件",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },

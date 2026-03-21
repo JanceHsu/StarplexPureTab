@@ -45,10 +45,7 @@
                 </button>
 
                 <div id="engine-switcher-dropdown" class="engine-switcher-dropdown hidden">
-                    <div class="engine-option" data-engine="google">Google</div>
-                    <div class="engine-option" data-engine="bing">Bing</div>
-                    <div class="engine-option" data-engine="yandex">Yandex</div>
-                    <div class="engine-option" data-engine="baidu">Baidu</div>
+                    <!-- 动态生成 -->
                 </div>
             </div>
 
@@ -62,6 +59,9 @@
     <!-- 搜索区域 -->
     <div class="search-container">
         <form id="search-form" class="search-form" autocomplete="off">
+            <div id="jump-bubble" class="jump-bubble hidden">
+                当前将直接跳转至: <span id="jump-bubble-text"></span>
+            </div>
             <div class="search-box">
                 <div class="search-input-container" id="search-input-container">
                     <input type="text" id="search-input" class="search-input" placeholder="加载中……" autocomplete="off"
@@ -81,38 +81,43 @@
     </div>
 
     <!-- 设置面板遮罩 -->
-    <div id="settings-overlay" class="settings-overlay hidden"></div>
+    <div id="settings-overlay" class="settings-overlay"></div>
 
     <!-- 设置面板 -->
-    <div id="settings-panel" class="settings-panel hidden">
+    <div id="settings-panel" class="settings-panel">
         <div class="settings-header">
-            <h2>设置</h2>
-            <button id="close-settings" class="close-settings">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="settings-header-top">
+                <h2>设置</h2>
+                <button id="close-settings" class="close-settings">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="tab-search">搜索引擎</button>                <button class="tab-btn" data-tab="tab-quick-links">快速链接</button>                <button class="tab-btn" data-tab="tab-general">常规</button>
+                <button class="tab-btn" data-tab="tab-appearance">外观</button>
+                <button class="tab-btn" data-tab="tab-data">数据</button>
+                <button class="tab-btn" data-tab="tab-about">关于</button>
+            </div>
         </div>
 
         <div class="settings-content">
-            <!-- 搜索引擎设置 -->
-            <div class="settings-section">
-                <h3>搜索引擎</h3>
-                <div class="radio-group">
-                    <label class="radio-item">
-                        <input type="radio" name="search-engine" value="google" checked>
-                        <span>Google</span>
-                    </label>
-                    <label class="radio-item">
-                        <input type="radio" name="search-engine" value="bing">
-                        <span>Bing</span>
-                    </label>
-                    <label class="radio-item">
-                        <input type="radio" name="search-engine" value="yandex">
-                        <span>Yandex</span>
-                    </label>
-                    <label class="radio-item">
-                        <input type="radio" name="search-engine" value="baidu">
-                        <span>Baidu</span>
-                    </label>
+            <!-- 搜索引擎 -->
+            <div class="settings-tab-pane active" id="tab-search">
+                <div class="settings-section">
+                    <h3>搜索引擎</h3>
+                <div class="radio-group" id="search-engine-radio-group">
+                    <!-- 动态生成 -->
+                </div>
+
+                <div id="search-engines-editor" class="quick-links-editor" style="display: block; margin-top: 15px; margin-bottom: 15px;">
+                    <h3>管理搜索引擎</h3>
+                    <label class="setting-label">支持使用 %s 表示搜索关键字</label>
+                    <div id="engines-list" class="links-list">
+                        <!-- 搜索引擎将在这里动态生成 -->
+                    </div>
+                    <button id="add-engine-btn" class="add-link-btn">
+                        <i class="fas fa-plus"></i> 添加搜索引擎
+                    </button>
                 </div>
 
                 <div class="setting-item" style="margin-top: 5px;">
@@ -131,9 +136,35 @@
                     </label>
                 </div>
             </div>
+            </div>
 
-            <hr class="section-divider">
+            <!-- 快速链接设置 -->
+            <div class="settings-tab-pane" id="tab-quick-links">
+                <div class="settings-section">
+                    <h3>快速链接</h3>
+                    <div class="setting-item">
+                        <label class="setting-label">启用快速链接</label>
+                        <label class="switch">
+                            <input type="checkbox" id="quick-links-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
 
+                    <div id="quick-links-editor" class="quick-links-editor">
+                        <h3>管理快速链接</h3>
+                        <label class="setting-label">最多可以添加 10 个快速链接</label>
+                        <div id="links-list" class="links-list">
+                            <!-- 快速链接将在这里动态生成 -->
+                        </div>
+                        <button id="add-link-btn" class="add-link-btn">
+                            <i class="fas fa-plus"></i> 添加链接
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 常规设置 -->
+            <div class="settings-tab-pane" id="tab-general">
             <!-- 历史记录设置 -->
             <div class="settings-section">
                 <h3>历史记录</h3>
@@ -149,31 +180,6 @@
                     <label id="clear-history-btn" class="clear-history-btn">
                         <i class="fas fa-trash"></i> 清除全部历史记录
                     </label>
-                </div>
-            </div>
-
-            <hr class="section-divider">
-
-            <!-- 快速链接设置 -->
-            <div class="settings-section">
-                <h3>快速链接</h3>
-                <div class="setting-item">
-                    <label class="setting-label">启用快速链接</label>
-                    <label class="switch">
-                        <input type="checkbox" id="quick-links-toggle" checked>
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-
-                <div id="quick-links-editor" class="quick-links-editor">
-                    <h3>管理快速链接</h3>
-                    <label class="setting-label">最多可以添加 10 个快速链接</label>
-                    <div id="links-list" class="links-list">
-                        <!-- 快速链接将在这里动态生成 -->
-                    </div>
-                    <button id="add-link-btn" class="add-link-btn">
-                        <i class="fas fa-plus"></i> 添加链接
-                    </button>
                 </div>
             </div>
 
@@ -195,9 +201,10 @@
                     <input type="text" id="custom-title-input" class="text-input" placeholder="请输入标题文字">
                 </div>
             </div>
+            </div>
 
-            <hr class="section-divider">
-
+            <!-- 外观设置 -->
+            <div class="settings-tab-pane" id="tab-appearance">
             <!-- 背景设置 -->
             <div class="settings-section">
                 <h3>背景</h3>
@@ -220,7 +227,10 @@
                 <!-- 纯色背景设置 -->
                 <div class="setting-item bg-color-setting hidden">
                     <label class="setting-label" for="bg-color-picker">背景颜色</label>
-                    <input type="color" id="bg-color-picker" class="color-picker" value="#ffffff">
+                    <div class="theme-color-controls">
+                        <input type="color" id="bg-color-picker" class="color-picker" value="#ffffff">
+                        <span id="bg-color-hex" class="color-hex-label">#FFFFFF</span>
+                    </div>
                 </div>
 
                 <!-- 本地图片设置 -->
@@ -269,7 +279,7 @@
                     <label class="setting-label" for="theme-color-picker">选择主题颜色</label>
                     <div class="theme-color-controls">
                         <input type="color" id="theme-color-picker" class="color-picker" value="#6366f1">
-                        <!-- <div id="theme-color-preview" class="theme-color-preview"></div> -->
+                        <span id="theme-color-hex" class="color-hex-label">#6366F1</span>
                     </div>
                 </div>
             </div>
@@ -294,35 +304,35 @@
                     </label>
                 </div>
             </div>
+            </div>
 
-            <hr class="section-divider">
-
-            <!-- 设置管理 -->
-            <div class="settings-section">
-                <h3>设置管理</h3>
-                <div class="setting-item">
-                    <label class="setting-label">导入设置</label>
-                    <div class="import-export-controls">
-                        <label for="import-settings" class="import-btn">
-                            <i class="fas fa-upload"></i> 导入
-                        </label>
-                        <input type="file" id="import-settings" class="import-input" accept=".json">
-                        <span id="import-filename" class="import-filename">未选择文件</span>
+            <!-- 数据与设置管理 -->
+            <div class="settings-tab-pane" id="tab-data">
+                <div class="settings-section">
+                    <h3>数据</h3>
+                    <div class="setting-item">
+                        <label class="setting-label">导入设置</label>
+                        <div class="import-export-controls">
+                            <label for="import-settings" class="import-btn">
+                                <i class="fas fa-upload"></i> 导入
+                            </label>
+                            <input type="file" id="import-settings" class="import-input" accept=".json">
+                            <span id="import-filename" class="import-filename">未选择文件</span>
+                        </div>
                     </div>
-                </div>
-                <div class="setting-item">
-                    <label class="setting-label">导出设置</label>
-                    <label id="export-settings" class="export-btn">
-                        <i class="fas fa-download"></i> 导出
-                    </label>
+                    <div class="setting-item">
+                        <label class="setting-label">导出设置</label>
+                        <label id="export-settings" class="export-btn">
+                            <i class="fas fa-download"></i> 导出
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <hr class="section-divider">
-
             <!-- 关于 -->
-            <div class="settings-section">
-                <h3>关于</h3>
+            <div class="settings-tab-pane" id="tab-about">
+                <div class="settings-section">
+                    <h3>关于</h3>
                 <div class="setting-item">
                     <img src="./assets/logo_clear.png" alt="星函标签页"
                         style="display:block;width:100px;margin:0 auto 18px auto;border-radius:25%;">
@@ -330,7 +340,7 @@
                     <label class="setting-label">让每一次上网都赏心悦目</label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">版本</label>
-                        <label style="width: 50%; text-align: right;">1.2.4</label>
+                        <label style="width: 50%; text-align: right;">1.3.0</label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">作者</label>
@@ -339,15 +349,34 @@
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">更新日志</label>
                         <label style="width: 50%; text-align: right;">
-                            <a href="https://starplex.top/product-puretab#updatelogs" class="about-link-btn"><i class="fas fa-book"></i> 点击查看</a>
+                            <a href="https://starplex.top/product-puretab#updatelogs" class="about-link-btn">查看</a>
+                        </label>
+                    </label>
+                    <label class="setting-label" style="width: 100%; display: flex;">
+                        <label style="width: 50%; text-align: left;">官方网站</label>
+                        <label style="width: 50%; text-align: right;">
+                            <a href="https://starplex.top/product-puretab" class="about-link-btn">前往</a>
                         </label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 50%; text-align: left;">开源项目地址</label>
                         <label style="width: 50%; text-align: right;">
-                            <a href="https://github.com/JanceHsu/StarplexPureTab" class="about-link-btn" target="_blank">
-                                <i class="fab fa-github"></i> 点击前往
-                            </a>
+                            <a id="repo-link" href="#" class="about-link-btn" target="_blank">前往</a>
+                        </label>
+                    </label>
+                </div>
+            </div>
+
+            <hr class="section-divider">
+
+            <!-- 反馈 -->
+            <div class="settings-section">
+                <h3>反馈</h3>
+                <div class="setting-item">
+                    <label class="setting-label" style="width: 100%; display: flex;">
+                        <label style="width: 50%; text-align: left;">联系我们</label>
+                        <label style="width: 50%; text-align: right;">
+                            <a href="https://starplex.top/contact?product=puretab" class="about-link-btn">前往</a>
                         </label>
                     </label>
                 </div>
@@ -375,12 +404,21 @@
                     </label>
                 </div>
             </div>
+            </div>
 
         </div>
 
         <div class="settings-footer">
+            <div class="history-actions">
+                <button id="undo-settings" class="history-btn" title="撤销" disabled>
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button id="redo-settings" class="history-btn" title="恢复" disabled>
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
             <button id="reset-settings" class="reset-btn">
-                <i class="fas fa-redo"></i> 重置设置
+                <i class="fas fa-trash-restore"></i> 重置设置
             </button>
         </div>
     </div>

@@ -10,15 +10,19 @@ let quickLinks = [];
 let showTitle = true;
 let customTitleText = '星函标签页';
 let showSearchHistoryEnabled = true;
-let isRemovingHistory = false;
 let settingsBackup = null; // 用于重置设置时的备份
+
+let settingsHistory = [];
+let settingsHistoryIndex = -1;
+let isUndoRedoOperation = false;
+
 let engineSwitchEnabled = true;
 let bgInfoEnabled = true;
 let directJumpEnabled = false;
 
 // 主题色变量
-const lightBg = '#ffffff';
-const darkBg = '#1a1a1a';
+const lightBg = 'rgba(255, 255, 255, 0.8)';
+const darkBg = 'rgba(30, 30, 30, 0.8)';
 
 // 存储必应图片信息
 let bingImageInfo = {
@@ -27,12 +31,12 @@ let bingImageInfo = {
 };
 
 // 搜索引擎信息映射
-const ENGINE_INFO = {
-    google: { name: 'Google', icon: '<i class="fab fa-google"></i>' },
-    bing: { name: 'Bing', icon: '<i class="fab fa-microsoft"></i>' },
-    yandex: { name: 'Yandex', icon: '<i class="fab fa-yandex"></i>' },
-    baidu: { name: 'Baidu', icon: '<i class="fas fa-globe"></i>' }
-};
+let searchEngines = [
+    { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
+    { id: 'bing', name: 'Bing', url: 'https://www.bing.com/search?q=%s' },
+    { id: 'yandex', name: 'Yandex', url: 'https://yandex.com/search/?text=%s' },
+    { id: 'baidu', name: 'Baidu', url: 'https://www.baidu.com/s?wd=%s' }
+];
 
 // DOM 元素
 const searchForm = document.getElementById('search-form');
@@ -52,16 +56,19 @@ const bgImageUpload = document.getElementById('bg-image-upload');
 const imagePreview = document.getElementById('image-preview');
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const themeColorPicker = document.getElementById('theme-color-picker');
-const themeColorPreview = document.getElementById('theme-color-preview');
 const displayModeRadios = document.querySelectorAll('input[name="display-mode"]');
-const searchEngineRadios = document.querySelectorAll('input[name="search-engine"]');
+let searchEngineRadios = document.querySelectorAll('input[name="search-engine"]');
 const overlayOpacitySlider = document.getElementById('overlay-opacity');
 const overlayOpacityValue = document.querySelector('.opacity-value');
 const quickLinksToggle = document.getElementById('quick-links-toggle');
 const quickLinksContainer = document.getElementById('quick-links-container');
 const linksList = document.getElementById('links-list');
+const enginesList = document.getElementById('engines-list');
 const addLinkBtn = document.getElementById('add-link-btn');
+const addEngineBtn = document.getElementById('add-engine-btn');
 const resetSettingsBtn = document.getElementById('reset-settings');
+const undoSettingsBtn = document.getElementById('undo-settings');
+const redoSettingsBtn = document.getElementById('redo-settings');
 const exportSettingsBtn = document.getElementById('export-settings');
 const importSettingsInput = document.getElementById('import-settings');
 const importFilename = document.getElementById('import-filename');
@@ -73,7 +80,7 @@ const customTitle = document.getElementById('custom-title');
 const clearSearchHistoryBtn = document.getElementById('clear-history-btn');
 const showSearchHistoryToggle = document.getElementById('show-history-toggle');
 const showSearchInputContainer = document.getElementById('search-input-container');
-const searchEngineQuickRadios = document.querySelectorAll('input[name="search-engine-quick"]');
+let searchEngineQuickRadios = document.querySelectorAll('input[name="search-engine-quick"]');
 const engineSwitcherBtn = document.getElementById('engine-switcher-btn');
 const engineSwitcherName = document.getElementById('engine-switcher-name');
 const engineSwitcherDropdown = document.getElementById('engine-switcher-dropdown');
@@ -82,14 +89,26 @@ const engineSwitchToggle = document.getElementById('engine-switch-toggle');
 const bgInfoToggle = document.getElementById('bg-info-toggle');
 const directJumpToggle = document.getElementById('direct-jump-toggle');
 const engineSwitcherCaret = document.getElementById('engine-switcher-caret');
+const jumpBubble = document.getElementById('jump-bubble');
+const jumpBubbleText = document.getElementById('jump-bubble-text');
 
 // 初始化函数
 function init() {
+    // 渲染搜索引擎相关UI
+    updateSearchEnginesEditor();
+    updateSearchEnginesUI();
+
     // 确保DOM完全加载后再设置事件监听器
     setupEventListeners();
 
     // 加载设置
     loadSettings();
+
+    // 更新初始状态
+    customTitleInput.value = customTitleText;
+    updateTitleDisplay();
+    
+    fetchRepoPath();
 
     // 初始化标题显示
     customTitleInput.value = customTitleText;
@@ -123,6 +142,23 @@ function setupEventListeners() {
     closeSettingsBtn.addEventListener('click', closeSettings);
     settingsOverlay.addEventListener('click', closeSettings);
 
+    // 设置面板标签页切换
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.settings-tab-pane');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            
+            // 移除所有 active 类
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+            
+            // 给当前点击的标签和对应内容添加 active 类
+            btn.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+        });
+    });
+
     // 背景类型切换
     bgTypeRadios.forEach(radio => {
         radio.addEventListener('change', function () {
@@ -151,6 +187,7 @@ function setupEventListeners() {
     // 直接跳转功能开关
     directJumpToggle.addEventListener('change', function () {
         directJumpEnabled = this.checked;
+        setSearchEngineName();
         saveSettings(); // Save immediately
     });
 
@@ -212,8 +249,15 @@ function setupEventListeners() {
     // 添加快速链接- inside addNewLink
     addLinkBtn.addEventListener('click', addNewLink);
 
+    // 添加自定义搜索引擎
+    addEngineBtn.addEventListener('click', addNewEngine);
+
     // 重置设置
     resetSettingsBtn.addEventListener('click', resetSettings);
+
+    // 撤销与恢复
+    undoSettingsBtn.addEventListener('click', undoSettings);
+    redoSettingsBtn.addEventListener('click', redoSettings);
 
     // 导出设置
     exportSettingsBtn.addEventListener('click', exportSettings);
@@ -254,20 +298,23 @@ function setupEventListeners() {
 
     // 搜索框聚焦时展示历史
     searchInput.addEventListener('focus', function (e) {
-        isRemovingHistory = false;
+        checkDirectJumpBubble(e.target.value);
         if (e.target.value === '' || e.target.value == undefined || e.target.value == null) showSearchHistory();
         else hideSearchHistory();
     });
 
     // 输入时也可实时展示（搜索框有字符后收起）
     searchInput.addEventListener('input', function (e) {
-        isRemovingHistory = false;
+        checkDirectJumpBubble(e.target.value);
         if (e.target.value === '' || e.target.value == undefined || e.target.value == null) showSearchHistory();
         else hideSearchHistory();
     });
 
     // 失焦时隐藏历史
-    searchInput.addEventListener('blur', hideSearchHistory);
+    searchInput.addEventListener('blur', function() {
+        hideSearchHistory();
+        if (jumpBubble) jumpBubble.classList.add('hidden');
+    });
 
     // 搜索框下方快速切换搜索引擎
     searchEngineQuickRadios.forEach(radio => {
@@ -298,95 +345,81 @@ function needsHttp(host) {
     return false;
 }
 
+function checkDirectJumpBubble(val) {
+    const raw = (val || '').trim();
+    if (!jumpBubble || !jumpBubbleText) return;
+    
+    const jumpUrl = checkShouldJumpInfo(raw);
+    if (jumpUrl) {
+        jumpBubbleText.textContent = jumpUrl;
+        jumpBubble.classList.remove('hidden');
+    } else {
+        jumpBubble.classList.add('hidden');
+    }
+}
+
+// 提取判断是否应该直接跳转的逻辑
+function checkShouldJumpInfo(raw) {
+    if (!raw) return null;
+    
+    // 如果没有启用，则仅对带协议的允许直接跳转
+    if (!directJumpEnabled) {
+        if (/^https?:\/\//i.test(raw)) return raw;
+        return null; // 不跳转
+    }
+
+    // 启用了自动跳转，先检查带协议
+    if (/^https?:\/\//i.test(raw)) return raw;
+
+    let shouldJump = false;
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d+)?(\/.*)?$/;
+    const localhostRegex = /^localhost(:\d+)?(\/.*)?$/i;
+    const domainRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}(?::\d+)?(\/.*)?$/;
+
+    if (ipRegex.test(raw) || localhostRegex.test(raw) || domainRegex.test(raw)) {
+        shouldJump = true;
+    }
+
+    if (shouldJump) {
+        let hostCandidate = raw.split('/')[0];
+        hostCandidate = hostCandidate.replace(/^https?:\/\//i, '');
+        const proto = needsHttp(hostCandidate) ? 'http' : 'https';
+        return `${proto}://${raw}`;
+    }
+    return null;
+}
+
 // 处理搜索提交（支持直接跳转到网址，并对无协议的地址智能选择 http/https）
 function handleSearch(e) {
     e.preventDefault();
     const raw = (searchInput.value || '').trim();
     if (!raw) return;
 
-    // 已带协议的直接使用（保持用户输入意图），不受设置限制
-    if (/^https?:\/\//i.test(raw)) {
-        window.location.href = raw;
-        return;
-    }
-
-    // 判断是否应该直接跳转
-    let shouldJump = false;
-    
-    // 只有在启用设置时才进行智能识别
-    if (directJumpEnabled) {
-        // 识别 IPv4 地址 (X.X.X.X[:port])
-        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d+)?(\/.*)?$/;
-        
-        // 识别 localhost
-        const localhostRegex = /^localhost(:\d+)?(\/.*)?$/i;
-        
-        // 识别标准域名 (xxx.xx.xx)
-        // 要求至少包含一个点，且顶级域名至少2个字母
-        // 排除纯数字或非标准字符
-        const domainRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}(?::\d+)?(\/.*)?$/;
-
-        if (ipRegex.test(raw) || localhostRegex.test(raw) || domainRegex.test(raw)) {
-            shouldJump = true;
-        }
-    }
-
-    if (shouldJump) {
-        // 取出 hostCandidate（raw 的主机部分）
-        let hostCandidate = raw.split('/')[0];
-        // 如果包含 scheme-like 前缀（极少情况），移除
-        hostCandidate = hostCandidate.replace(/^https?:\/\//i, '');
-        // 选择协议
-        const proto = needsHttp(hostCandidate) ? 'http' : 'https';
-        const url = `${proto}://${raw}`;
-        window.location.href = url;
+    const jumpUrl = checkShouldJumpInfo(raw);
+    if (jumpUrl) {
+        window.location.href = jumpUrl;
         return;
     }
 
     // 不是网址，按搜索引擎搜索
     saveSearchHistory(raw); // 保存历史
     let url = '';
-    switch (currentEngine) {
-        case 'google':
-            url = `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
-            break;
-        case 'bing':
-            url = `https://www.bing.com/search?q=${encodeURIComponent(raw)}`;
-            break;
-        case 'yandex':
-            url = `https://yandex.com/search/?text=${encodeURIComponent(raw)}`;
-            break;
-        case 'baidu':
-            url = `https://www.baidu.com/s?wd=${encodeURIComponent(raw)}`;
-            break;
-        default:
-            url = `https://www.bing.com/search?q=${encodeURIComponent(raw)}`;
-    }
+    const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0] || { url: 'https://www.bing.com/search?q=%s' };
+    url = engineConf.url.replace('%s', encodeURIComponent(raw));
     window.location.href = url;
 }
 
 
 // 打开设置面板
 function openSettings() {
-    settingsOverlay.classList.remove('hidden');
-    settingsPanel.classList.remove('hidden');
-    // 添加动画效果
-    setTimeout(() => {
-        settingsOverlay.style.opacity = '1';
-        settingsPanel.style.transform = 'translateX(0)';
-    }, 10);
+    settingsOverlay.classList.add('open');
+    settingsPanel.classList.add('open');
 }
 
 // 关闭设置面板
 function closeSettings() {
-    settingsOverlay.style.opacity = '0';
-    settingsPanel.style.transform = 'translateX(100%)';
-
-    // 动画结束后隐藏元素
-    setTimeout(() => {
-        settingsOverlay.classList.add('hidden');
-        settingsPanel.classList.add('hidden');
-    }, 300);
+    settingsOverlay.classList.remove('open');
+    settingsPanel.classList.remove('open');
 }
 
 // 更新搜索引擎切换按钮显示状态
@@ -428,6 +461,7 @@ function switchBgType(type) {
             break;
         case 'bing':
             fetchBingImage();
+            break;
         default:
             fetchBingImage();
             break;
@@ -438,6 +472,11 @@ function switchBgType(type) {
 function handleColorChange() {
     backgroundLayer.style.background = bgColorPicker.value;
     backgroundLayer.style.backgroundImage = 'none';
+    
+    const bgColorHexLabel = document.getElementById('bg-color-hex');
+    if (bgColorHexLabel) {
+        bgColorHexLabel.textContent = bgColorPicker.value.toUpperCase();
+    }
 }
 
 // 处理图片上传
@@ -468,7 +507,19 @@ function handleThemeColorChange(e) {
     const color = e.target.value;
     currentThemeColor = color;
     document.documentElement.style.setProperty('--theme-color', color);
-    // themeColorPreview.style.background = color;
+    
+    const themeColorHexLabel = document.getElementById('theme-color-hex');
+    if (themeColorHexLabel) {
+        themeColorHexLabel.textContent = color.toUpperCase();
+    }
+    
+    // 计算亮度和合适的文本颜色 (对比度)
+    let r = parseInt(color.substring(1, 3), 16);
+    let g = parseInt(color.substring(3, 5), 16);
+    let b = parseInt(color.substring(5, 7), 16);
+    let brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    let textColor = brightness > 125 ? '#000000' : '#ffffff';
+    document.documentElement.style.setProperty('--theme-text-color', textColor);
 }
 
 // 设置搜索引擎
@@ -483,8 +534,8 @@ function setSearchEngine(engine) {
 // 更新顶部搜索引擎按钮UI
 function updateEngineSwitcherUI() {
     if (!engineSwitcherBtn) return;
-    const info = ENGINE_INFO[currentEngine] || ENGINE_INFO.bing;
-    engineSwitcherName.textContent = info.name;
+    const info = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+    engineSwitcherName.textContent = info ? info.name : '未知';
 }
 
 // 顶部搜索引擎切换按钮事件
@@ -503,21 +554,7 @@ function setupEngineSwitcherEvents() {
             engineSwitcherCaret.classList.add('fa-caret-up');
         }
     });
-    // 选项点击
-    engineSwitcherDropdown.querySelectorAll('.engine-option').forEach(opt => {
-        opt.addEventListener('click', function () {
-            const engine = this.getAttribute('data-engine');
-            setSearchEngine(engine);
-            setSearchEngineName();
-            updateEngineSwitcherUI();
-            engineSwitcherDropdown.classList.add('hidden');
-            // 同步设置面板
-            searchEngineRadios.forEach(r => r.checked = r.value === engine);
-            // 收起时箭头恢复向下
-            engineSwitcherCaret.classList.remove('fa-caret-up');
-            engineSwitcherCaret.classList.add('fa-caret-down');
-        });
-    });
+
     // 点击外部关闭下拉
     document.addEventListener('click', function () {
         engineSwitcherDropdown.classList.add('hidden');
@@ -528,7 +565,13 @@ function setupEngineSwitcherEvents() {
 
 // 设置搜索引擎提示
 function setSearchEngineName() {
-    searchInput.placeholder = '在 ' + currentEngine.charAt(0).toUpperCase() + currentEngine.slice(1) + ' 中搜索……';
+    const info = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+    const engineName = info ? info.name : '';
+    let suffix = '……';
+    if (directJumpEnabled) {
+        suffix = ' 或 直接跳转' + suffix;
+    }
+    searchInput.placeholder = '在 ' + engineName + ' 中搜索' + suffix;
 }
 
 // 更新显示模式
@@ -592,10 +635,22 @@ function updateQuickLinksEditor() {
     linksList.innerHTML = '';
 
     quickLinks.forEach((link, index) => {
+        let domain = '';
+        try {
+            const tempUrl = new URL(link.url);
+            domain = tempUrl.hostname;
+        } catch (e) {
+            domain = '';
+        }
+        const iconUrl = domain ? `https://${domain}/favicon.ico` : '';
+
         const linkItem = document.createElement('div');
         linkItem.className = 'link-item';
         linkItem.innerHTML = `
             <div class="link-item-fields">
+                <div style="width: 16px; height: 16px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+                    <img src="${iconUrl}" style="width: 16px; height: 16px; border-radius: 2px;" onerror="this.outerHTML='<i class=\\'fas fa-link\\' style=\\'font-size:14px; color:var(--theme-color);\\'></i>'">
+                </div>
                 <input type="text" class="link-name" placeholder="名称（选填）" value="${link.name}">
                 <input type="url" class="link-url" placeholder="网址（必填）" value="${link.url}">
             </div>
@@ -745,6 +800,185 @@ function updateQuickLinksDisplay() {
     }
 }
 
+// 动态渲染搜索引擎UI（单选组和下拉选项）
+function updateSearchEnginesUI() {
+    // 渲染管理面板的单选
+    const radioGroup = document.getElementById('search-engine-radio-group');
+    if (radioGroup) {
+        radioGroup.innerHTML = '';
+        searchEngines.forEach(engine => {
+            const label = document.createElement('label');
+            label.className = 'radio-item';
+            label.innerHTML = `
+                <input type="radio" name="search-engine" value="${engine.id}" ${currentEngine === engine.id ? 'checked' : ''}>
+                <span>${engine.name}</span>
+            `;
+            radioGroup.appendChild(label);
+        });
+        
+        // 重新绑定事件
+        searchEngineRadios = document.querySelectorAll('input[name="search-engine"]');
+        searchEngineRadios.forEach(radio => {
+            radio.addEventListener('change', function () {
+                setSearchEngine(this.value);
+                setSearchEngineName();
+                saveSettings(); // Save engine choice immediately
+            });
+        });
+    }
+
+    // 渲染下拉
+    if (engineSwitcherDropdown) {
+        engineSwitcherDropdown.innerHTML = '';
+        searchEngines.forEach(engine => {
+            const opt = document.createElement('div');
+            opt.className = 'engine-option';
+            opt.setAttribute('data-engine', engine.id);
+
+            // 获取网站域名用于favicon
+            let domain = '';
+            try {
+                const url = new URL(engine.url.replace('%s', ''));
+                domain = url.hostname;
+            } catch (e) {
+                domain = '';
+            }
+            const iconUrl = domain ? `https://${domain}/favicon.ico` : '';
+
+            opt.innerHTML = `<img src="${iconUrl}" style="width:16px;height:16px;border-radius:2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:16px; color:#888; width:16px; height:16px; display:flex; align-items:center; justify-content:center;\\'></i>'"><span>${engine.name}</span>`;
+            
+            opt.addEventListener('click', function () {
+                const engineId = this.getAttribute('data-engine');
+                setSearchEngine(engineId);
+                setSearchEngineName();
+                updateEngineSwitcherUI();
+                engineSwitcherDropdown.classList.add('hidden');
+                
+                // 同步设置面板并保存
+                searchEngineRadios.forEach(r => r.checked = r.value === engineId);
+                searchEngineQuickRadios.forEach(r => r.checked = r.value === engineId);
+                saveSettings();
+                
+                // 收起时箭头恢复向下
+                engineSwitcherCaret.classList.remove('fa-caret-up');
+                engineSwitcherCaret.classList.add('fa-caret-down');
+            });
+            engineSwitcherDropdown.appendChild(opt);
+        });
+    }
+    updateEngineSwitcherUI();
+}
+
+// 动态渲染管理搜索引擎引擎列表
+function updateSearchEnginesEditor() {
+    if (!enginesList) return;
+    enginesList.innerHTML = '';
+    searchEngines.forEach((engine, index) => {
+        let domain = '';
+        try {
+            const url = new URL(engine.url.replace('%s', ''));
+            domain = url.hostname;
+        } catch (e) {
+            domain = '';
+        }
+        const iconUrl = domain ? `https://${domain}/favicon.ico` : '';
+
+        const item = document.createElement('div');
+        item.className = 'link-item';
+        item.innerHTML = `
+            <div class="link-item-fields">
+                <div style="width: 16px; height: 16px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+                    <img src="${iconUrl}" style="width: 16px; height: 16px; border-radius: 2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:14px; color:#888;\\'></i>'">
+                </div>
+                <input type="text" class="engine-name" placeholder="搜索引擎名称" value="${engine.name}">
+                <input type="url" class="engine-url" placeholder="网址（形如：https://xxx.com/search?q=%s）" value="${engine.url}">
+            </div>
+            <div class="link-item-actions">
+                <button class="sort-btn-up" data-index="${index}"><i class="fas fa-arrow-up"></i></button>
+                <button class="sort-btn-down" data-index="${index}"><i class="fas fa-arrow-down"></i></button>
+                <button class="delete-link-btn" data-index="${index}"><i class="fas fa-trash"></i> 删除</button>
+            </div>
+        `;
+        enginesList.appendChild(item);
+
+        const nameInput = item.querySelector('.engine-name');
+        const urlInput = item.querySelector('.engine-url');
+
+        nameInput.addEventListener('input', function () {
+            searchEngines[index].name = this.value;
+            saveSettings();
+            updateSearchEnginesUI();
+        });
+
+        urlInput.addEventListener('input', function () {
+            searchEngines[index].url = this.value;
+            saveSettings();
+            updateSearchEnginesUI();
+        });
+
+        // 删除
+        const deleteBtn = item.querySelector('.delete-link-btn');
+        deleteBtn.addEventListener('click', function () {
+            if (searchEngines.length <= 1) {
+                showToast('至少需保留一个搜索引擎');
+                return;
+            }
+            const idx = parseInt(this.getAttribute('data-index'));
+            searchEngines.splice(idx, 1);
+            // 如果删除了当前选中的
+            if (!searchEngines.find(e => e.id === currentEngine)) {
+                currentEngine = searchEngines[0].id;
+            }
+            updateSearchEnginesEditor();
+            updateSearchEnginesUI();
+            setSearchEngine(currentEngine);
+            setSearchEngineName();
+            saveSettings();
+        });
+
+        // 上移
+        const sortBtnUp = item.querySelector('.sort-btn-up');
+        sortBtnUp.addEventListener('click', function () {
+            const idx = parseInt(this.getAttribute('data-index'));
+            if (idx > 0) {
+                const temp = searchEngines[idx - 1];
+                searchEngines[idx - 1] = searchEngines[idx];
+                searchEngines[idx] = temp;
+                updateSearchEnginesEditor();
+                updateSearchEnginesUI();
+                saveSettings();
+            } else showToast('已经是第一个了');
+        });
+
+        // 下移
+        const sortBtnDown = item.querySelector('.sort-btn-down');
+        sortBtnDown.addEventListener('click', function () {
+            const idx = parseInt(this.getAttribute('data-index'));
+            if (idx < searchEngines.length - 1) {
+                const temp = searchEngines[idx + 1];
+                searchEngines[idx + 1] = searchEngines[idx];
+                searchEngines[idx] = temp;
+                updateSearchEnginesEditor();
+                updateSearchEnginesUI();
+                saveSettings();
+            } else showToast('已经是最后一个了');
+        });
+    });
+}
+
+function addNewEngine() {
+    const newEngine = {
+        id: 'engine_' + Date.now(),
+        name: '自定义引擎',
+        url: ''
+    };
+    searchEngines.push(newEngine);
+    updateSearchEnginesEditor();
+    updateSearchEnginesUI();
+    saveSettings();
+    enginesList.scrollTop = enginesList.scrollHeight;
+}
+
 // 更新标题显示
 function updateTitleDisplay() {
     titleArea.style.display = showTitle ? 'flex' : 'none';
@@ -775,6 +1009,12 @@ function fetchBingImage() {
                 url: cache.url
             };
         }
+    }
+
+    // 如果处于撤销或恢复操作中，或者今天已经成功拉取并缓存过有效图片，则不再发起新的异步请求。
+    // 这避免了因为一些支持随机返回的API导致每次撤销/刷新都跳变图片。
+    if ((isUndoRedoOperation && cache.url) || (cache.date === today && cache.url)) {
+        return;
     }
 
     // 异步请求最新图片
@@ -869,12 +1109,17 @@ function showCustomModal(html) {
 
     msg.innerHTML = html;
     modal.classList.remove('hidden');
+    modal.classList.remove('is-closing');
     cancelBtn.style.display = 'none'; // 只显示确定按钮
 
     function cleanup() {
         okBtn.onclick = null;
-        modal.classList.add('hidden');
-        cancelBtn.style.display = ''; // 恢复
+        modal.classList.add('is-closing');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('is-closing');
+            cancelBtn.style.display = ''; // 恢复
+        }, 300);
     }
 
     okBtn.onclick = cleanup;
@@ -897,20 +1142,11 @@ function saveSearchHistory(keyword) {
 
 // 隐藏搜索历史
 function hideSearchHistory() {
-    // 延迟隐藏，以便点击历史记录项的事件能被触发
-    setTimeout(() => {
-        // 清除单条历史记录时不隐藏
-        if (isRemovingHistory) {
-            searchInput.focus();
-            return;
-        }
-
-        const list = document.getElementById('search-history-list');
-        if (list) {
-            list.classList.remove('active');
-        }
-        updateSearchInputContainerBackground('blur');
-    }, 200);
+    const list = document.getElementById('search-history-list');
+    if (list) {
+        list.classList.remove('active');
+    }
+    updateSearchInputContainerBackground('blur');
 }
 
 // 清除搜索历史
@@ -934,13 +1170,20 @@ function showSearchHistory() {
         updateSearchInputContainerBackground('blur');
         return;
     }
-    isRemovingHistory = false; // 重置是否点击了✕的状态
+    
     list.innerHTML = '';
     history.forEach(item => {
         const div = document.createElement('div');
         div.style.display = 'flex';
         div.style.alignItems = 'center';
         div.style.justifyContent = 'space-between';
+        
+        // 阻止点击空白处导致失去焦点
+        div.onmousedown = (e) => {
+            if (e.target === div) {
+                e.preventDefault();
+            }
+        };
 
         // 历史文本
         const textSpan = document.createElement('span');
@@ -949,7 +1192,8 @@ function showSearchHistory() {
         textSpan.style.cursor = 'pointer';
 
         // 点击历史文本进行搜索
-        textSpan.onmousedown = () => {
+        textSpan.onmousedown = (e) => {
+            e.preventDefault(); // 防止输入框失去焦点
             // 先把该项保存到历史顶部，确保顺序更新
             saveSearchHistory(item);
 
@@ -959,23 +1203,8 @@ function showSearchHistory() {
             updateSearchInputContainerBackground('blur');
             const query = item.trim();
             if (query) {
-                let url = '';
-                switch (currentEngine) {
-                    case 'google':
-                        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-                        break;
-                    case 'bing':
-                        url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-                        break;
-                    case 'yandex':
-                        url = `https://yandex.com/search/?text=${encodeURIComponent(query)}`;
-                        break;
-                    case 'baidu':
-                        url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
-                        break;
-                    default:
-                        url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-                }
+                const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0] || { url: 'https://www.bing.com/search?q=%s' };
+                let url = engineConf.url.replace('%s', encodeURIComponent(query));
                 window.location.href = url;
             }
             // 不再调用 searchInput.blur()，避免触发额外隐藏逻辑导致问题
@@ -989,12 +1218,12 @@ function showSearchHistory() {
         delBtn.style.color = '#888';
         delBtn.style.cursor = 'pointer';
         delBtn.onmousedown = (e) => {
+            e.preventDefault(); // 防止输入框失去焦点
             e.stopPropagation();
             // 删除该条历史
             let historyArr = getSearchHistory();
             historyArr = historyArr.filter(h => h !== item);
             localStorage.setItem('searchHistory', JSON.stringify(historyArr));
-            isRemovingHistory = true; // 点击了✕的状态改为真
             updateSearchInputContainerBackground('focus');
             updateSearchHistoryDisplay();
             showToast('已删除该条历史记录');
@@ -1010,28 +1239,12 @@ function showSearchHistory() {
 
 // 更新搜索历史显示
 function updateSearchHistoryDisplay() {
-    const history = getSearchHistory();
-    const list = document.getElementById('search-history-list');
-    if (!list) return;
-
-    list.innerHTML = '';
-    history.forEach(item => {
-        const div = document.createElement('div');
-        div.textContent = item;
-        list.appendChild(div);
-    });
+    showSearchHistory();
 }
 
 // 更新搜索输入框背景
 function updateSearchInputContainerBackground(e) {
-    if (e === 'focus') {
-        showSearchInputContainer.style.boxShadow = '0 -2px 1px #969696';
-        if (currentRealDisplayMode === 'dark') showSearchInputContainer.style.backgroundColor = darkBg;
-        else if (currentRealDisplayMode === 'light') showSearchInputContainer.style.backgroundColor = lightBg;
-    } else if (e === 'blur') {
-        showSearchInputContainer.style.backgroundColor = 'transparent';
-        showSearchInputContainer.style.boxShadow = 'none';
-    }
+    // Background and shadow logic is now handled by pure modern CSS
 }
 
 // 设置搜索引擎并同步单选框
@@ -1055,11 +1268,16 @@ function customConfirm(message, onOk, onCancel) {
 
     msg.textContent = message;
     modal.classList.remove('hidden');
+    modal.classList.remove('is-closing');
 
     function cleanup() {
         okBtn.onclick = null;
         cancelBtn.onclick = null;
-        modal.classList.add('hidden');
+        modal.classList.add('is-closing');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('is-closing');
+        }, 300);
     }
 
     okBtn.onclick = () => {
@@ -1070,6 +1288,18 @@ function customConfirm(message, onOk, onCancel) {
         cleanup();
         if (onCancel) onCancel();
     };
+}
+
+function fetchRepoPath() {
+    fetch('https://api.starplex.top/data/puretab.json')
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.repository_path) {
+                const repoLink = document.getElementById('repo-link');
+                if (repoLink) repoLink.href = data.repository_path;
+            }
+        })
+        .catch(err => console.error('获取仓库地址失败', err));
 }
 
 // 页面加载完成后初始化

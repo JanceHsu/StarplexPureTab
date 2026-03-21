@@ -1,7 +1,20 @@
-// 保存设置到本地存储
-function saveSettings() {
+let saveSettingsTimeout;
+// 保存设置到本地存储 (防抖处理以提升拖拽性能与避免过多历史记录)
+function saveSettings(immediate = false) {
+    if (immediate) {
+        performSave();
+    } else {
+        clearTimeout(saveSettingsTimeout);
+        saveSettingsTimeout = setTimeout(() => {
+            performSave();
+        }, 300);
+    }
+}
+
+function performSave() {
     const settings = {
         searchEngine: currentEngine,
+        searchEngines: searchEngines,
         bgType: currentBgType,
         bgColor: bgColorPicker.value,
         themeColor: currentThemeColor,
@@ -17,6 +30,52 @@ function saveSettings() {
         directJumpEnabled: directJumpEnabled
     };
     localStorage.setItem('searchPageSettings', JSON.stringify(settings));
+
+    if (!isUndoRedoOperation) {
+        // Remove future states if we are not at the end
+        if (settingsHistoryIndex < settingsHistory.length - 1) {
+            settingsHistory = settingsHistory.slice(0, settingsHistoryIndex + 1);
+        }
+        
+        // 避免重复记录完全相同的状态
+        const newStateStr = JSON.stringify(settings);
+        if (settingsHistory.length === 0 || settingsHistory[settingsHistory.length - 1] !== newStateStr) {
+            settingsHistory.push(newStateStr);
+            settingsHistoryIndex++;
+            updateUndoRedoButtons();
+        }
+    }
+}
+
+function updateUndoRedoButtons() {
+    if (undoSettingsBtn) undoSettingsBtn.disabled = settingsHistoryIndex <= 0;
+    if (redoSettingsBtn) redoSettingsBtn.disabled = settingsHistoryIndex >= settingsHistory.length - 1;
+}
+
+function undoSettings() {
+    if (settingsHistoryIndex > 0) {
+        settingsHistoryIndex--;
+        applyHistoryState(settingsHistory[settingsHistoryIndex]);
+    }
+}
+
+function redoSettings() {
+    if (settingsHistoryIndex < settingsHistory.length - 1) {
+        settingsHistoryIndex++;
+        applyHistoryState(settingsHistory[settingsHistoryIndex]);
+    }
+}
+
+function applyHistoryState(stateStr) {
+    if (!stateStr) return;
+    isUndoRedoOperation = true;
+    localStorage.setItem('searchPageSettings', stateStr);
+    
+    // We need to re-init everything to reflect the state
+    loadSettings();
+    updateUndoRedoButtons();
+    
+    isUndoRedoOperation = false;
 }
 
 // 从本地存储加载设置
@@ -24,6 +83,15 @@ function loadSettings() {
     const savedSettings = localStorage.getItem('searchPageSettings');
     if (savedSettings) {
         const settings = JSON.parse(savedSettings);
+
+        // 加载自定义搜索引擎
+        if (settings.searchEngines && Array.isArray(settings.searchEngines) && settings.searchEngines.length > 0) {
+            searchEngines = settings.searchEngines;
+        }
+
+        // 重新渲染搜索引擎UI
+        updateSearchEnginesEditor();
+        updateSearchEnginesUI();
 
         // 加载搜索引擎设置
         if (settings.searchEngine) {
@@ -40,18 +108,24 @@ function loadSettings() {
             showSearchHistoryToggle.checked = showSearchHistoryEnabled;
         }
 
+        // 加载背景颜色 - 需要在切换之前设置好，以免 handleColorChange 使用旧颜色
+        if (settings.bgColor) {
+            bgColorPicker.value = settings.bgColor;
+        }
+
         // 加载背景设置
         if (settings.bgType) {
+            // 如果只有类型相同，没必要重新 fetchBingImage 防止闪烁
+            const isSameBg = (currentBgType === settings.bgType);
             currentBgType = settings.bgType;
-            switchBgType(currentBgType);
+            if (isSameBg && currentBgType === 'bing' && isUndoRedoOperation) {
+                // 如果是撤销操作且原来就是bing，不要重新fetch，避免画面闪或者重加载
+            } else {
+                switchBgType(currentBgType);
+            }
 
-            // 加载背景颜色
-            if (settings.bgColor) {
-                bgColorPicker.value = settings.bgColor;
-                if (currentBgType === 'color') {
-                    handleColorChange();
-                }
-
+            if (currentBgType === 'color') {
+                handleColorChange();
             }
 
             // 加载本地背景图片
@@ -67,14 +141,10 @@ function loadSettings() {
                 imagePreviewContainer.classList.remove('hidden');
             }
 
-            // 加载必应背景图片
-            const bingImage = localStorage.getItem('bingBgImage');
-            if (bingImage && currentBgType === 'bing') {
-                backgroundLayer.style.backgroundImage = `url(${bingImage})`;
-                backgroundLayer.style.backgroundSize = 'cover';
-                backgroundLayer.style.backgroundPosition = 'center';
-                backgroundLayer.style.backgroundRepeat = 'no-repeat';
-            }
+            // 加载必应背景图片 (已废弃使用bingBgImage，改为在fetchBingImage里用bingBgCache)
+            // 如果bing不闪烁逻辑没启动或者需要刷新，可以通过switchBgType里的fetchBingImage来做。
+            // 这里之前的代码引用了 bingBgImage 可能会错误地将背景替换成了不存在或过期的图片对象。
+            // 为了安全直接删除这段从 bingBgImage 的错误恢复。
 
             // 设置背景类型单选框选中
             bgTypeRadios.forEach(radio => {
@@ -87,8 +157,8 @@ function loadSettings() {
         if (settings.themeColor) {
             currentThemeColor = settings.themeColor;
             themeColorPicker.value = settings.themeColor;
-            document.documentElement.style.setProperty('--theme-color', settings.themeColor);
-            // themeColorPreview.style.background = settings.themeColor;
+            // 触发一次函数来计算亮度和应用颜色
+            handleThemeColorChange({ target: { value: settings.themeColor } });
         }
 
         // 加载显示模式
@@ -177,8 +247,8 @@ function loadSettings() {
         // 默认标题设置
         showTitle = true;
         showTitleToggle.checked = true;
-        customTitleText = '';
-        customTitleInput.value = '';
+        customTitleText = '星函标签页';
+        customTitleInput.value = '星函标签页';
 
         // 默认显示历史记录
         showSearchHistoryEnabled = true;
@@ -200,6 +270,20 @@ function loadSettings() {
     updateDisplayMode();
     updateQuickLinksDisplay();
     updateQuickLinksEditor();
+
+    if (!isUndoRedoOperation && settingsHistory.length === 0) {
+        let currentLocal = localStorage.getItem('searchPageSettings');
+        if (!currentLocal) {
+            // Force save initial defaults to be the first state
+            isUndoRedoOperation = true; 
+            saveSettings(true);
+            isUndoRedoOperation = false;
+            currentLocal = localStorage.getItem('searchPageSettings');
+        }
+        settingsHistory.push(currentLocal);
+        settingsHistoryIndex = 0;
+        updateUndoRedoButtons();
+    }
 }
 
 // 重置设置为默认值
@@ -287,7 +371,7 @@ function resetSettings() {
         updateBgInfoBtnVisible();
 
         // 保存重置后的设置
-        saveSettings();
+        saveSettings(true);
 
         // 显示提示
         showToast('已重置为默认设置');
@@ -451,7 +535,7 @@ function importSettings(e) {
                 directJumpToggle.checked = directJumpEnabled;
             }
 
-            saveSettings();
+            saveSettings(true);
             showToast('设置已导入');
 
             // 关键：清空备份并关闭面板，防止被预览机制还原

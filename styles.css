@@ -197,6 +197,10 @@ body {
     gap: 10px;
 }
 
+.engine-option.selected {
+    font-weight: 600;
+}
+
 .engine-option img,
 .engine-option i.fas {
     margin-right: 0 !important;
@@ -407,11 +411,11 @@ body {
     align-items: center;
     justify-content: center;
     width: 90px;
-    height: 90px;
+    height: 95px; /* Increased from 90px to prevent text clipping */
     text-decoration: none;
     transition: var(--transition);
     border-radius: var(--radius-lg);
-    padding: 15px;
+    padding: 10px 15px; /* Reduced vertical padding */
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -450,6 +454,8 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    line-height: 1.2; /* Ensures text has enough space and doesn't get cut vertically */
+    padding-bottom: 2px; /* Prevent descender clipping */
     transition: var(--transition);
 }
 
@@ -653,7 +659,8 @@ body {
     margin-bottom: 12px;
 }
 
-.text-input {
+.text-input,
+.settings-select {
     padding: 10px 14px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--light-border);
@@ -662,6 +669,20 @@ body {
     color: inherit;
     background-color: rgba(255,255,255,0.5);
     transition: var(--transition);
+}
+
+.settings-dropdown-container {
+    position: relative;
+    width: 240px;
+    margin-bottom: 5px;
+}
+
+.settings-select {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
 }
 
 .color-picker {
@@ -1224,6 +1245,7 @@ input:checked+.slider {
 }
 
 .light-mode .text-input,
+.light-mode .settings-select,
 .light-mode .image-preview {
     border-color: var(--light-border);
     background-color: rgba(255,255,255,0.5);
@@ -1381,6 +1403,7 @@ input:checked+.slider {
 }
 
 .dark-mode .text-input,
+.dark-mode .settings-select,
 .dark-mode .image-preview {
     border-color: var(--dark-border);
     background-color: rgba(0,0,0,0.5);

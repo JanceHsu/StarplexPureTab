@@ -57,7 +57,7 @@ const imagePreview = document.getElementById('image-preview');
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const themeColorPicker = document.getElementById('theme-color-picker');
 const displayModeRadios = document.querySelectorAll('input[name="display-mode"]');
-let searchEngineRadios = document.querySelectorAll('input[name="search-engine"]');
+let searchEngineSelect = document.getElementById('search-engine-select');
 const overlayOpacitySlider = document.getElementById('overlay-opacity');
 const overlayOpacityValue = document.querySelector('.opacity-value');
 const quickLinksToggle = document.getElementById('quick-links-toggle');
@@ -219,17 +219,15 @@ function setupEventListeners() {
         });
     });
 
-    // 搜索引擎切换
-    searchEngineRadios.forEach(radio => {
-        radio.addEventListener('change', function () {
-            if (this.checked) {
-                currentEngine = this.value;
-                setSearchEngine(currentEngine); // Ensure UI sync 
-                setSearchEngineName();
-                saveSettings(); // Save immediately
-            }
+    // 搜索引擎下拉切换
+    if (searchEngineSelect) {
+        searchEngineSelect.addEventListener('change', function () {
+            currentEngine = this.value;
+            setSearchEngine(currentEngine); // Ensure UI sync 
+            setSearchEngineName();
+            saveSettings(); // Save immediately
         });
-    });
+    }
 
     // 遮罩透明度调整
     overlayOpacitySlider.addEventListener('input', function () {
@@ -323,7 +321,9 @@ function setupEventListeners() {
                 setSearchEngine(this.value);
                 setSearchEngineName();
                 // 同步设置面板
-                searchEngineRadios.forEach(r => r.checked = r.value === this.value);
+                if (searchEngineSelect) {
+                    searchEngineSelect.value = this.value;
+                }
             }
         });
     });
@@ -522,42 +522,93 @@ function handleThemeColorChange(e) {
     document.documentElement.style.setProperty('--theme-text-color', textColor);
 }
 
-// 设置搜索引擎
-function setSearchEngine(engine) {
-    currentEngine = engine;
-    searchEngineRadios.forEach(radio => {
-        radio.checked = radio.value === engine;
-    });
-    updateEngineSwitcherUI();
-}
+// 设置搜索引擎 (Moved)
 
 // 更新顶部搜索引擎按钮UI
 function updateEngineSwitcherUI() {
-    if (!engineSwitcherBtn) return;
-    const info = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
-    engineSwitcherName.textContent = info ? info.name : '未知';
+    if (engineSwitcherName) {
+        const info = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+        engineSwitcherName.textContent = info ? info.name : '未知';
+    }
+    
+    // 更新设置面板里的名称
+    const settingsEngineName = document.getElementById('settings-engine-name');
+    if (settingsEngineName) {
+        const info = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+        settingsEngineName.textContent = info ? info.name : '未知';
+    }
+    
+    // 更新下拉列表中的选中态
+    document.querySelectorAll('.engine-option').forEach(opt => {
+        const engineId = opt.getAttribute('data-engine');
+        if (engineId === currentEngine) {
+            opt.classList.add('selected');
+            if (!opt.querySelector('.fa-check')) {
+                opt.insertAdjacentHTML('beforeend', '<i class="fas fa-check" style="font-size:14px; color:var(--theme-color);"></i>');
+            }
+        } else {
+            opt.classList.remove('selected');
+            const check = opt.querySelector('.fa-check');
+            if (check) check.remove();
+        }
+    });
 }
 
 // 顶部搜索引擎切换按钮事件
 function setupEngineSwitcherEvents() {
-    if (!engineSwitcherBtn) return;
-    // 展开/收起下拉
-    engineSwitcherBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        engineSwitcherDropdown.classList.toggle('hidden');
-        // 切换箭头方向
-        if (engineSwitcherDropdown.classList.contains('hidden')) {
-            engineSwitcherCaret.classList.remove('fa-caret-up');
-            engineSwitcherCaret.classList.add('fa-caret-down');
-        } else {
-            engineSwitcherCaret.classList.remove('fa-caret-down');
-            engineSwitcherCaret.classList.add('fa-caret-up');
-        }
-    });
+    if (engineSwitcherBtn) {
+        // 展开/收起下拉
+        engineSwitcherBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            engineSwitcherDropdown.classList.toggle('hidden');
+            // 切换箭头方向
+            if (engineSwitcherDropdown.classList.contains('hidden')) {
+                engineSwitcherCaret.classList.remove('fa-caret-up');
+                engineSwitcherCaret.classList.add('fa-caret-down');
+            } else {
+                engineSwitcherCaret.classList.remove('fa-caret-down');
+                engineSwitcherCaret.classList.add('fa-caret-up');
+            }
+        });
+    }
+
+    const settingsEngineSelectBtn = document.getElementById('settings-engine-select-btn');
+    const settingsEngineDropdown = document.getElementById('settings-engine-dropdown');
+    
+    if (settingsEngineSelectBtn && settingsEngineDropdown) {
+        settingsEngineSelectBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            settingsEngineDropdown.classList.toggle('hidden');
+            const caret = settingsEngineSelectBtn.querySelector('.fas');
+            
+            if (settingsEngineDropdown.classList.contains('hidden')) {
+                caret.classList.remove('fa-caret-up');
+                caret.classList.add('fa-caret-down');
+            } else {
+                caret.classList.remove('fa-caret-down');
+                caret.classList.add('fa-caret-up');
+            }
+        });
+    }
 
     // 点击外部关闭下拉
     document.addEventListener('click', function () {
-        engineSwitcherDropdown.classList.add('hidden');
+        if (engineSwitcherDropdown) {
+            engineSwitcherDropdown.classList.add('hidden');
+            if (engineSwitcherCaret) {
+                engineSwitcherCaret.classList.add('fa-caret-down');
+                engineSwitcherCaret.classList.remove('fa-caret-up');
+            }
+        }
+        
+        if (settingsEngineDropdown) {
+            settingsEngineDropdown.classList.add('hidden');
+            const caret = settingsEngineSelectBtn?.querySelector('.fas');
+            if (caret) {
+                caret.classList.add('fa-caret-down');
+                caret.classList.remove('fa-caret-up');
+            }
+        }
         engineSwitcherCaret.classList.remove('fa-caret-up');
         engineSwitcherCaret.classList.add('fa-caret-down');
     });
@@ -648,9 +699,6 @@ function updateQuickLinksEditor() {
         linkItem.className = 'link-item';
         linkItem.innerHTML = `
             <div class="link-item-fields">
-                <div style="width: 16px; height: 16px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
-                    <img src="${iconUrl}" style="width: 16px; height: 16px; border-radius: 2px;" onerror="this.outerHTML='<i class=\\'fas fa-link\\' style=\\'font-size:14px; color:var(--theme-color);\\'></i>'">
-                </div>
                 <input type="text" class="link-name" placeholder="名称（选填）" value="${link.name}">
                 <input type="url" class="link-url" placeholder="网址（必填）" value="${link.url}">
             </div>
@@ -802,31 +850,6 @@ function updateQuickLinksDisplay() {
 
 // 动态渲染搜索引擎UI（单选组和下拉选项）
 function updateSearchEnginesUI() {
-    // 渲染管理面板的单选
-    const radioGroup = document.getElementById('search-engine-radio-group');
-    if (radioGroup) {
-        radioGroup.innerHTML = '';
-        searchEngines.forEach(engine => {
-            const label = document.createElement('label');
-            label.className = 'radio-item';
-            label.innerHTML = `
-                <input type="radio" name="search-engine" value="${engine.id}" ${currentEngine === engine.id ? 'checked' : ''}>
-                <span>${engine.name}</span>
-            `;
-            radioGroup.appendChild(label);
-        });
-        
-        // 重新绑定事件
-        searchEngineRadios = document.querySelectorAll('input[name="search-engine"]');
-        searchEngineRadios.forEach(radio => {
-            radio.addEventListener('change', function () {
-                setSearchEngine(this.value);
-                setSearchEngineName();
-                saveSettings(); // Save engine choice immediately
-            });
-        });
-    }
-
     // 渲染下拉
     if (engineSwitcherDropdown) {
         engineSwitcherDropdown.innerHTML = '';
@@ -845,27 +868,60 @@ function updateSearchEnginesUI() {
             }
             const iconUrl = domain ? `https://${domain}/favicon.ico` : '';
 
-            opt.innerHTML = `<img src="${iconUrl}" style="width:16px;height:16px;border-radius:2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:16px; color:#888; width:16px; height:16px; display:flex; align-items:center; justify-content:center;\\'></i>'"><span>${engine.name}</span>`;
+            opt.innerHTML = `<img src="${iconUrl}" style="width:16px;height:16px;border-radius:2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:16px; color:#888; width:16px; height:16px; display:flex; align-items:center; justify-content:center;\\'></i>'">
+                             <span style="flex-grow: 1; text-align: left;">${engine.name}</span>`;
             
             opt.addEventListener('click', function () {
                 const engineId = this.getAttribute('data-engine');
                 setSearchEngine(engineId);
                 setSearchEngineName();
-                updateEngineSwitcherUI();
                 engineSwitcherDropdown.classList.add('hidden');
-                
-                // 同步设置面板并保存
-                searchEngineRadios.forEach(r => r.checked = r.value === engineId);
-                searchEngineQuickRadios.forEach(r => r.checked = r.value === engineId);
-                saveSettings();
                 
                 // 收起时箭头恢复向下
                 engineSwitcherCaret.classList.remove('fa-caret-up');
                 engineSwitcherCaret.classList.add('fa-caret-down');
+                
+                saveSettings();
             });
             engineSwitcherDropdown.appendChild(opt);
         });
     }
+
+    // 渲染管理面板的下拉框
+    const settingsEngineDropdown = document.getElementById('settings-engine-dropdown');
+    if (settingsEngineDropdown) {
+        settingsEngineDropdown.innerHTML = '';
+        searchEngines.forEach(engine => {
+            const opt = document.createElement('div');
+            opt.className = 'engine-option';
+            opt.setAttribute('data-engine', engine.id);
+
+            // 获取网站域名用于favicon
+            let domain = '';
+            try {
+                const url = new URL(engine.url.replace('%s', ''));
+                domain = url.hostname;
+            } catch (e) {
+                domain = '';
+            }
+            const iconUrl = domain ? `https://${domain}/favicon.ico` : '';
+
+            opt.innerHTML = `<img src="${iconUrl}" style="width:16px;height:16px;border-radius:2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:16px; color:#888; width:16px; height:16px; display:flex; align-items:center; justify-content:center;\\'></i>'">
+                             <span style="flex-grow: 1; text-align: left;">${engine.name}</span>`;
+            
+            opt.addEventListener('click', function () {
+                const engineId = this.getAttribute('data-engine');
+                setSearchEngine(engineId);
+                setSearchEngineName();
+                settingsEngineDropdown.classList.add('hidden');
+                document.querySelector('#settings-engine-select-btn .fas').classList.replace('fa-caret-up', 'fa-caret-down');
+                
+                saveSettings();
+            });
+            settingsEngineDropdown.appendChild(opt);
+        });
+    }
+    
     updateEngineSwitcherUI();
 }
 
@@ -890,8 +946,8 @@ function updateSearchEnginesEditor() {
                 <div style="width: 16px; height: 16px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
                     <img src="${iconUrl}" style="width: 16px; height: 16px; border-radius: 2px;" onerror="this.outerHTML='<i class=\\'fas fa-globe\\' style=\\'font-size:14px; color:#888;\\'></i>'">
                 </div>
-                <input type="text" class="engine-name" placeholder="搜索引擎名称" value="${engine.name}">
-                <input type="url" class="engine-url" placeholder="网址（形如：https://xxx.com/search?q=%s）" value="${engine.url}">
+                <input type="text" class="engine-name" placeholder="名称" value="${engine.name}">
+                <input type="url" class="engine-url" placeholder="网址" value="${engine.url}">
             </div>
             <div class="link-item-actions">
                 <button class="sort-btn-up" data-index="${index}"><i class="fas fa-arrow-up"></i></button>
@@ -1247,16 +1303,14 @@ function updateSearchInputContainerBackground(e) {
     // Background and shadow logic is now handled by pure modern CSS
 }
 
-// 设置搜索引擎并同步单选框
+// 设置搜索引擎
 function setSearchEngine(engine) {
     currentEngine = engine;
-    searchEngineRadios.forEach(radio => {
-        radio.checked = radio.value === engine;
-    });
     // 同步搜索框下方按钮组
     searchEngineQuickRadios.forEach(radio => {
         radio.checked = radio.value === engine;
     });
+    updateEngineSwitcherUI();
 }
 
 // 自定义确认对话框

@@ -96,10 +96,10 @@ function loadSettings() {
         // 加载搜索引擎设置
         if (settings.searchEngine) {
             setSearchEngine(settings.searchEngine);
-            // 设置搜索引擎类型单选框选中
-            searchEngineRadios.forEach(radio => {
-                radio.checked = radio.value === settings.searchEngine;
-            });
+            // 设置搜索引擎下拉框选中
+            if (typeof searchEngineSelect !== 'undefined' && searchEngineSelect) {
+                searchEngineSelect.value = settings.searchEngine;
+            }
         }
 
         // 加载显示搜索历史记录开关
@@ -328,10 +328,10 @@ function resetSettings() {
             radio.checked = radio.value === 'bing';
         });
 
-        // 设置搜索引擎类型单选框选中
-        searchEngineRadios.forEach(radio => {
-            radio.checked = radio.value === 'bing';
-        });
+        // 设置搜索引擎下拉框选中
+        if (typeof searchEngineSelect !== 'undefined' && searchEngineSelect) {
+            searchEngineSelect.value = 'bing';
+        }
 
         // 设置搜索引擎提示
         setSearchEngineName();
@@ -439,10 +439,10 @@ function importSettings(e) {
             if (settings.searchEngine) {
                 setSearchEngine(settings.searchEngine);
 
-                // 设置搜索引擎类型单选框选中
-                searchEngineRadios.forEach(radio => {
-                    radio.checked = radio.value === settings.searchEngine;
-                });
+                // 设置搜索引擎下拉框选中
+                if (typeof searchEngineSelect !== 'undefined' && searchEngineSelect) {
+                    searchEngineSelect.value = settings.searchEngine;
+                }
 
                 // 设置搜索引擎提示
                 setSearchEngineName();

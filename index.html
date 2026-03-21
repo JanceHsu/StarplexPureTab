@@ -105,8 +105,14 @@
             <div class="settings-tab-pane active" id="tab-search">
                 <div class="settings-section">
                     <h3>搜索引擎</h3>
-                <div class="radio-group" id="search-engine-radio-group">
-                    <!-- 动态生成 -->
+                <div class="settings-dropdown-container" id="settings-engine-dropdown-container">
+                    <div id="settings-engine-select-btn" class="settings-select">
+                        <span id="settings-engine-name"></span>
+                        <i class="fas fa-caret-down" style="pointer-events: none;"></i>
+                    </div>
+                    <div id="settings-engine-dropdown" class="engine-switcher-dropdown hidden" style="width: 100%; top: 100%; margin-top: 5px;">
+                        <!-- 动态生成 -->
+                    </div>
                 </div>
 
                 <div id="search-engines-editor" class="quick-links-editor" style="display: block; margin-top: 15px; margin-bottom: 15px;">
@@ -157,7 +163,7 @@
                             <!-- 快速链接将在这里动态生成 -->
                         </div>
                         <button id="add-link-btn" class="add-link-btn">
-                            <i class="fas fa-plus"></i> 添加链接
+                            <i class="fas fa-plus"></i> 添加快速链接
                         </button>
                     </div>
                 </div>
@@ -359,7 +365,7 @@
                         </label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
-                        <label style="width: 50%; text-align: left;">开源项目地址</label>
+                        <label style="width: 50%; text-align: left;">仓库地址</label>
                         <label style="width: 50%; text-align: right;">
                             <a id="repo-link" href="#" class="about-link-btn" target="_blank">前往</a>
                         </label>
@@ -386,13 +392,10 @@
 
             <!-- 版权信息 -->
             <div class="settings-section">
-                <h3>版权信息</h3>
+                <h3>说明</h3>
                 <div class="setting-item">
                     <label class="setting-label" style="width: 100%; display: flex;">
-                        <label style="width: 100%; text-align: left;">使用“星函标签页”插件，即代表您了解：</label>
-                    </label>
-                    <label class="setting-label" style="width: 100%; display: flex;">
-                        <label style="width: 100%; text-align: left;">“星函标签页”插件仅供学习交流使用，不得进行任何商业性质的活动。</label>
+                        <label style="width: 100%; text-align: left;">“星函标签页”插件仅供学习交流使用，不得用于任何商业性质的活动。</label>
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label style="width: 100%; text-align: left;">“星函标签页”插件是开源项目，遵循 MIT
@@ -400,7 +403,7 @@
                     </label>
                     <label class="setting-label" style="width: 100%; display: flex;">
                         <label
-                            style="width: 100%; text-align: left;">“星函标签页”插件中，“每日一图”功能所需的图片来自微软必应壁纸，相关图片仅作为本插件的可选壁纸使用，不用于任何商业性质的活动。相关图片的版权信息，请点击每日一图背景信息查阅。</label>
+                            style="width: 100%; text-align: left;">“星函标签页”插件中，“每日一图”功能所需的图片来自 Microsoft Bing 壁纸，相关图片仅作为本插件的可选壁纸使用，不用于任何商业性质的活动。相关图片的版权信息，请点击每日一图背景信息查阅。</label>
                     </label>
                 </div>
             </div>
@@ -418,7 +421,7 @@
                 </button>
             </div>
             <button id="reset-settings" class="reset-btn">
-                <i class="fas fa-trash-restore"></i> 重置设置
+                <i class="fas fa-trash-restore"></i> 重置
             </button>
         </div>
     </div>

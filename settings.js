@@ -223,7 +223,11 @@ function loadSettings() {
         setSearchEngineName();
     } else {
         // 默认设置
-        setSearchEngine('bing');
+        if (searchEngines && searchEngines.length > 0) {
+            setSearchEngine(searchEngines[0].id);
+        } else {
+            setSearchEngine('');
+        }
         switchBgType('bing');
         themeColorPicker.value = '#2780BB';
         handleThemeColorChange({ target: { value: '#2780BB' } });
@@ -295,7 +299,7 @@ function resetSettings() {
         // localStorage.removeItem('bingBgImage');
 
         // 重置变量
-        currentEngine = 'bing';
+        currentEngine = searchEngines && searchEngines.length > 0 ? searchEngines[0].id : '';
         currentBgType = 'bing';
         currentThemeColor = '#2780BB';
         currentDisplayMode = 'system';
@@ -314,7 +318,7 @@ function resetSettings() {
         directJumpToggle.checked = false;
 
         // 重置UI
-        setSearchEngine('bing');
+        setSearchEngine(currentEngine);
         switchBgType('bing');
         themeColorPicker.value = '#2780BB';
         handleThemeColorChange({ target: { value: '#2780BB' } });
@@ -330,7 +334,7 @@ function resetSettings() {
 
         // 设置搜索引擎下拉框选中
         if (typeof searchEngineSelect !== 'undefined' && searchEngineSelect) {
-            searchEngineSelect.value = 'bing';
+            searchEngineSelect.value = currentEngine;
         }
 
         // 设置搜索引擎提示
@@ -388,7 +392,9 @@ function resetSettings() {
 function exportSettings() {
     // 获取当前设置
     const settings = {
+        version: version, // 添加版本号
         searchEngine: currentEngine,
+        searchEngines: searchEngines, // 导出自定义搜索引擎
         bgType: currentBgType,
         bgColor: bgColorPicker.value,
         themeColor: currentThemeColor,
@@ -412,7 +418,7 @@ function exportSettings() {
     // 创建下载链接
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Starplex-Tab-Settings.json';
+    a.download = 'StarplexPureTab-Settings.json';
     document.body.appendChild(a);
     a.click();
 
@@ -425,6 +431,19 @@ function exportSettings() {
     showToast('设置已导出');
 }
 
+// 判断版本号
+function compareVersion(v1, v2) {
+    const p1 = String(v1).split('.').map(Number);
+    const p2 = String(v2).split('.').map(Number);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+        const n1 = p1[i] || 0;
+        const n2 = p2[i] || 0;
+        if (n1 > n2) return 1;
+        if (n1 < n2) return -1;
+    }
+    return 0;
+}
+
 // 导入设置
 function importSettings(e) {
     const file = e.target.files[0];
@@ -434,6 +453,18 @@ function importSettings(e) {
     reader.onload = function (event) {
         try {
             const settings = JSON.parse(event.target.result);
+
+            if (!settings.version || compareVersion(settings.version, version) < 0) {
+                showToast('导入失败：设置文件版本低于当前插件版本');
+                return;
+            }
+
+            // 导入自定义搜索引擎
+            if (settings.searchEngines && Array.isArray(settings.searchEngines)) {
+                searchEngines = settings.searchEngines;
+                updateSearchEnginesEditor();
+                updateSearchEnginesUI();
+            }
 
             // 应用导入的设置
             if (settings.searchEngine) {

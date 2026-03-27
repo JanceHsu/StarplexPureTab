@@ -1,5 +1,5 @@
 // 全局变量
-let currentEngine = 'bing';
+let currentEngine = '';
 let currentBgType = 'bing';
 let currentThemeColor = '#2780BB';
 let currentDisplayMode = 'system';
@@ -30,13 +30,10 @@ let bingImageInfo = {
     url: ''
 };
 
-// 搜索引擎信息映射
-let searchEngines = [
-    { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
-    { id: 'bing', name: 'Bing', url: 'https://www.bing.com/search?q=%s' },
-    { id: 'yandex', name: 'Yandex', url: 'https://yandex.com/search/?text=%s' },
-    { id: 'baidu', name: 'Baidu', url: 'https://www.baidu.com/s?wd=%s' }
-];
+let searchEngines = [];
+
+// 版本号
+const version = '1.3.1'
 
 // DOM 元素
 const searchForm = document.getElementById('search-form');
@@ -94,6 +91,12 @@ const jumpBubbleText = document.getElementById('jump-bubble-text');
 
 // 初始化函数
 function init() {
+    // 设置版本号
+    const aboutVersionLabel = document.getElementById('about-version');
+    if (aboutVersionLabel) {
+        aboutVersionLabel.textContent = version;
+    }
+
     // 渲染搜索引擎相关UI
     updateSearchEnginesEditor();
     updateSearchEnginesUI();
@@ -404,9 +407,13 @@ function handleSearch(e) {
     // 不是网址，按搜索引擎搜索
     saveSearchHistory(raw); // 保存历史
     let url = '';
-    const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0] || { url: 'https://www.bing.com/search?q=%s' };
-    url = engineConf.url.replace('%s', encodeURIComponent(raw));
-    window.location.href = url;
+    const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+    if (engineConf) {
+        url = engineConf.url.replace('%s', encodeURIComponent(raw));
+        window.location.href = url;
+    } else {
+        showToast('未配置搜索引擎');
+    }
 }
 
 
@@ -1259,9 +1266,13 @@ function showSearchHistory() {
             updateSearchInputContainerBackground('blur');
             const query = item.trim();
             if (query) {
-                const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0] || { url: 'https://www.bing.com/search?q=%s' };
-                let url = engineConf.url.replace('%s', encodeURIComponent(query));
-                window.location.href = url;
+                const engineConf = searchEngines.find(e => e.id === currentEngine) || searchEngines[0];
+                if (engineConf) {
+                    let url = engineConf.url.replace('%s', encodeURIComponent(query));
+                    window.location.href = url;
+                } else {
+                    showToast('未配置搜索引擎');
+                }
             }
             // 不再调用 searchInput.blur()，避免触发额外隐藏逻辑导致问题
         };
